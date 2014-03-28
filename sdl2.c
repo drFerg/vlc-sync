@@ -139,7 +139,7 @@ int vlc_main(char *filepath, struct socketAddr *conn) {
         // Apply a video filter.
         //"--video-filter", "sepia",
         //"--sepia-intensity=200"
-        "-vv",
+        "-v",
     };
     int vlc_argc = sizeof(vlc_argv) / sizeof(*vlc_argv);
 
@@ -171,7 +171,7 @@ int vlc_main(char *filepath, struct socketAddr *conn) {
             SDL_WINDOWPOS_UNDEFINED,
             SDL_WINDOWPOS_UNDEFINED,
             WIDTH, HEIGHT,
-            SDL_WINDOW_SHOWN|SDL_WINDOW_RESIZABLE| SDL_WINDOW_OPENGL);
+            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
     if (!window) {
         fprintf(stderr, "Couldn't create window: %s\n", SDL_GetError());
         quit(3);
@@ -216,7 +216,7 @@ int vlc_main(char *filepath, struct socketAddr *conn) {
 
     libvlc_video_set_callbacks(mp, lock, unlock, &display, &context);
     libvlc_video_set_format(mp, "RV16", VIDEOWIDTH, VIDEOHEIGHT, VIDEOWIDTH*2);
-    libvlc_media_player_play(mp);
+    //libvlc_media_player_play(mp);
 
 
     // Main loop.
@@ -249,6 +249,7 @@ int vlc_main(char *filepath, struct socketAddr *conn) {
                 if (ms.state == PAUSED) libvlc_media_player_pause(mp);
                 else libvlc_media_player_play(mp);
                 send_state(conn, ms.state);
+                printf("%s\n", (ms.state == PAUSED ? "PAUSED":"PLAYING"));
                 break;
         }
         if (ms.changed) {
@@ -368,6 +369,7 @@ void listener(struct socketAddr *conn){
 
 int main(int argc, char *argv[]) {
   pthread_t sniffer_thread, listener_thread;
+  char *remotePort, *localPort;
   struct sockaddr_in client_addr;
   struct socketAddr conn;
   struct socketAddr sender;
@@ -379,13 +381,19 @@ int main(int argc, char *argv[]) {
   char *client_addr_str;
   char *filepath;
   char c;
-  while ((c = getopt(argc, argv, "a:f:")) != -1) {
+  while ((c = getopt(argc, argv, "a:f:p:r:")) != -1) {
     switch (c) {
       case 'a': 
         client_addr_str = optarg; 
         break;
       case 'f':
         filepath = optarg;
+        break;
+      case 'p':
+        localPort = optarg;
+        break;
+      case 'r':
+        remotePort = optarg;
         break;
       case '?':
         if (optopt == 'a')
@@ -403,12 +411,21 @@ int main(int argc, char *argv[]) {
     conn.addr.sin_family = AF_INET;
     inet_pton(AF_INET, client_addr_str, &(conn.addr.sin_addr));
     inet_pton(AF_INET, client_addr_str, &(sender.addr.sin_addr));
-    conn.addr.sin_port = htons(atoi(PORT));
-    sender.addr.sin_port = htons(atoi(PORT));
+
+    if (&localPort != NULL)
+      conn.addr.sin_port = htons(atoi(localPort));
+    else 
+      conn.addr.sin_port = htons(atoi(PORT));
+    
+    if (&remotePort != NULL)
+      sender.addr.sin_port = htons(atoi(remotePort));
+    else       
+      sender.addr.sin_port = htons(atoi(remotePort));
+
     printf("%s\n", client_addr_str);
   }
   else{
-    printf("Usage: vlcsync <friend's IP> \n");
+    printf("Usage: vlcsync -a <friend's IP> -f <filepath> -p <localPort> -r <remotePort>\n");
     return 0;
   }
   printf(">> Initilising...\n");
